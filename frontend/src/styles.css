@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap');
 :root{font-family:'DM Sans',sans-serif;color-scheme:dark;--bg:#0b1020;--panel:#11182b;--panel2:#151d32;--line:#263149;--text:#f1f4fc;--muted:#8e9bb5;--accent:#7968ff;--accent2:#9c91ff;--teal:#20d9c2;--input:#0d1426} :root[data-theme="light"]{color-scheme:light;--bg:#f5f7fb;--panel:#fff;--panel2:#f2f4fa;--line:#e1e6f0;--text:#172039;--muted:#69758c;--accent:#6554ed;--accent2:#5847df;--teal:#0c9f91;--input:#f7f8fc}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-size:13px;transition:background .2s,color .2s}button,input,textarea,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.55;cursor:not-allowed}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}.brand{display:flex;align-items:center;gap:10px;font:800 20px Manrope,sans-serif;letter-spacing:-.7px}.brand-icon{width:35px;height:35px;border-radius:11px;background:linear-gradient(140deg,#8b7dff,#5d4be8);display:grid;place-items:center;color:#fff;box-shadow:0 6px 18px #7664ff30}.eyebrow{display:flex;align-items:center;gap:7px;color:var(--accent2);font-size:10px;font-weight:700;letter-spacing:1.5px}
