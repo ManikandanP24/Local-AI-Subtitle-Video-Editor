@@ -4,18 +4,44 @@ from fastapi import FastAPI,Depends,HTTPException,UploadFile,File,Response,Reque
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse,StreamingResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, inspect
 from .config import settings,STORAGE_ROOT
-from .db import Base,engine,get_db
+from .db import Base,engine,get_db,SessionLocal
 from .models import User,Project,MediaFile,SubtitleLine,Job
 from .schemas import ProjectCreate,SubtitleBatch,TranscribeRequest
 from .auth.routes import router as auth_router
 from .auth.deps import get_current_user
+from .auth.security import hash_password
 from .services.transcribe import transcribe_file
 from .services.ffmpeg import ffmpeg_available
 from .services.exporters import export_srt,export_vtt,export_txt,export_ass
 from .routes_styles import router as styles_router
 Base.metadata.create_all(bind=engine)
+# Upgrade existing SQLite databases created before the admin role was added.
+with engine.begin() as connection:
+    user_columns = {column["name"] for column in inspect(connection).get_columns("users")}
+    if "is_admin" not in user_columns:
+        connection.exec_driver_sql("ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT 0")
+
+def ensure_default_admin():
+    admin_email = settings.admin_email.strip().lower()
+    admin_password = settings.admin_password
+    if not admin_email or not admin_password:
+        print("ADMIN_EMAIL / ADMIN_PASSWORD not configured; skipping default admin bootstrap.")
+        return
+    if len(admin_password) < 16:
+        print("ADMIN_PASSWORD must be at least 16 characters; skipping default admin bootstrap.")
+        return
+    with SessionLocal() as db:
+        user = db.scalar(select(User).where(User.email == admin_email))
+        if user is None:
+            user = User(email=admin_email, password_hash=hash_password(admin_password), is_admin=True)
+            db.add(user)
+        else:
+            user.is_admin = True
+        db.commit()
+
+ensure_default_admin()
 app=FastAPI(title='LocalSubs API',version='0.1.0')
 app.add_middleware(CORSMiddleware,allow_origins=[x.strip() for x in settings.cors_origins.split(',') if x.strip()],allow_credentials=True,allow_methods=['*'],allow_headers=['*'])
 app.include_router(auth_router); app.include_router(styles_router)
