@@ -24,6 +24,14 @@ Windows: run `start.bat`.
 
 Open http://localhost:5173. The API docs are at http://127.0.0.1:8000/docs. Whisper downloads its model the first time transcription is used; the local default is `small`.
 
+## Default admin login
+
+The login screen pre-fills `admin@localsubs.app`. The administrator account is created only when `ADMIN_EMAIL` and a strong `ADMIN_PASSWORD` (at least 16 characters) are configured; the app intentionally does not ship with a public, guessable admin password.
+
+For the hosted app, open the [Render API service](https://dashboard.render.com/web/srv-dbgq9dff3r2c73adgqg0), go to **Environment**, set `ADMIN_PASSWORD` to a strong unique password, and save/redeploy. `ADMIN_EMAIL` is already configured as `admin@localsubs.app`. Once the API restarts, it creates that admin account if it does not already exist, or grants the admin role to the matching existing account without overwriting its password.
+
+For local use, add `ADMIN_EMAIL=admin@localsubs.app` and `ADMIN_PASSWORD=your-strong-password` to `backend/.env`, then restart the API. Never commit the password to GitHub.
+
 ## Current features
 
 - Custom register/login/logout and refresh-token rotation
