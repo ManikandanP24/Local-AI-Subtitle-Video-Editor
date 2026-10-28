@@ -10,6 +10,7 @@ class User(Base):
  password_hash:Mapped[str]=mapped_column(String(255))
  created_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),default=now)
  is_active:Mapped[bool]=mapped_column(Boolean,default=True)
+ is_admin:Mapped[bool]=mapped_column(Boolean,default=False,nullable=False)
  projects:Mapped[list['Project']]=relationship(back_populates='user',cascade='all, delete-orphan')
 class RefreshToken(Base):
  __tablename__='refresh_tokens'
