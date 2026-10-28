@@ -9,5 +9,17 @@ def export_ass(lines):
  head='[Script Info]\nScriptType: v4.00+\nPlayResX: 1920\nPlayResY: 1080\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,Noto Sans,58,&H00FFFFFF,&H0000D7FF,&H00000000,&H80000000,1,0,1,3,1,2,80,80,70,1\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n'
  rows=[]
  for x in lines:
-  text=x['text'].replace('{',r'\{').replace('}',r'\}').replace('\n',r'\N'); rows.append(f'Dialogue: 0,{ass_time(x["start"])},{ass_time(x["end"])},Default,,0,0,0,,{text}')
+  raw_text=str(x.get('text',''))
+  words=x.get('words') or []
+  if words:
+   # ASS karaoke tags highlight words according to the Whisper word-level timestamps.
+   parts=[]
+   for word in words:
+    duration=max(1,round((float(word.get('end',0))-float(word.get('start',0)))*100))
+    token=str(word.get('text','')).replace('{',r'\{').replace('}',r'\}')
+    parts.append('{\\k'+str(duration)+'}'+token)
+   text=''.join(parts).replace('\n',r'\N')
+  else:
+   text=raw_text.replace('{',r'\{').replace('}',r'\}').replace('\n',r'\N')
+  rows.append(f'Dialogue: 0,{ass_time(x["start"])},{ass_time(x["end"])},Default,,0,0,0,,{text}')
  return head+'\n'.join(rows)+'\n'
