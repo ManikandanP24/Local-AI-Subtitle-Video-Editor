@@ -1,23 +1,43 @@
 # LocalSubs — Local AI Subtitle & Video Editor
 
-Local-first subtitle editor built with React + Vite + TypeScript and FastAPI. Includes light/dark mode, installable PWA shell, custom auth, project dashboard, upload/streaming, Whisper transcription, subtitle editing and subtitle file exports.
+LocalSubs is a creator-focused subtitle editor built with React, Vite, TypeScript and FastAPI. It includes a responsive dashboard, dark/light mode, an installable PWA shell, custom authentication, media upload/preview, local Whisper transcription, subtitle editing, and SRT/VTT/ASS/TXT exports.
 
-## Development
+## Live preview
 
-Prerequisites: Python 3.11+, Node.js 20+, FFmpeg.
+- Web app: https://localsubs-frontend.onrender.com
+- API health: https://localsubs-api.onrender.com/health
+- API documentation: https://localsubs-api.onrender.com/docs
 
+The hosted preview sends media to the configured Render API. For a genuinely local workflow, run the app on your own computer using the steps below.
+
+## Run locally
+
+Prerequisites: Python 3.11+, Node.js 20+. The project includes `imageio-ffmpeg` as an FFmpeg binary fallback; installing system FFmpeg is still recommended.
+
+Linux/macOS:
 ```bash
 chmod +x start.sh
 ./start.sh
 ```
 
-Frontend: http://localhost:5173
-Backend API docs: http://127.0.0.1:8000/docs
+Windows: run `start.bat`.
 
-## Render deployment
+Open http://localhost:5173. The API docs are at http://127.0.0.1:8000/docs. Whisper downloads its model the first time transcription is used; the local default is `small`.
 
-The current architecture is local-first: uploads and SQLite are stored on local disk. Render services use ephemeral disks unless a persistent disk is configured; for durable hosted storage, configure a persistent disk and SQLite path, or migrate metadata to an appropriate database. Local Whisper may require a larger instance and model download. Keep secrets in Render environment variables and set secure cookies/HTTPS for hosted deployments.
+## Current features
 
-## MOGRT support
+- Custom register/login/logout and refresh-token rotation
+- Private projects and media uploads with seekable streaming
+- Whisper speech transcription with word timestamps and subtitle grouping
+- Subtitle text/timing editor and SRT, VTT, ASS and TXT exports
+- Light/dark theme switch with remembered preference
+- Install-app button, manifest and service worker for the installable PWA
+- MOGRT upload under **New caption style**
 
-Premiere Pro `.mogrt` files are motion-graphics templates, not video files. This project can accept/upload the file as a style asset, but rendering it requires a compatible Adobe Premiere Pro/After Effects workflow. FFmpeg rendering uses ASS subtitle styles and does not execute MOGRT templates directly.
+## MOGRT note
+
+A Premiere Pro `.mogrt` file is stored as a style asset and is not directly executable by FFmpeg. Actual MOGRT rendering requires compatible Adobe Premiere Pro/After Effects tooling. The current app renders standard subtitle exports; it does not yet render MOGRT templates into an MP4.
+
+## Hosting and storage
+
+Render services on the free plan use ephemeral storage here. Projects, SQLite data, uploaded videos, and uploaded style assets may be lost when the service is recreated or its filesystem is cleared. Do not use this hosted preview for irreplaceable media. For durable hosted storage, add a suitable persistent disk/database; for full local-first privacy, run it on your own machine. Configure secrets only as environment variables and keep HTTPS secure-cookie settings enabled in hosted environments.
