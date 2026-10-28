@@ -1,6 +1,7 @@
 from pathlib import Path
-import subprocess,shutil
+import subprocess
 from faster_whisper import WhisperModel
+from .ffmpeg import get_ffmpeg_path
 _cache={}
 def group_words(words):
  lines=[]; current=[]
@@ -13,9 +14,9 @@ def group_words(words):
  if current: lines.append({'start':current[0]['start'],'end':current[-1]['end'],'text':''.join(x['text'] for x in current).strip(),'words':current})
  return lines
 def transcribe_file(path,language=None,model_size='small'):
- if not shutil.which('ffmpeg'): raise RuntimeError('FFmpeg is required')
+ ffmpeg = get_ffmpeg_path()
  wav=str(Path(path).with_suffix('.localsubs.wav'))
- subprocess.run(['ffmpeg','-y','-i',path,'-vn','-ac','1','-ar','16000',wav],check=True,capture_output=True,text=True)
+ subprocess.run([ffmpeg,'-y','-i',path,'-vn','-ac','1','-ar','16000',wav],check=True,capture_output=True,text=True)
  try:
   model=_cache.get(model_size)
   if model is None:
