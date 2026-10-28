@@ -1,6 +1,6 @@
 from pathlib import Path
 import shutil,uuid,json,subprocess,re
-from fastapi import FastAPI,Depends,HTTPException,UploadFile,File,Response,Request
+from fastapi import FastAPI,Depends,HTTPException,UploadFile,File,Response,Request,BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse,StreamingResponse
 from sqlalchemy.orm import Session
@@ -124,23 +124,76 @@ def put_subtitles(project_id:int,batch:SubtitleBatch,user:User=Depends(get_curre
  db.query(SubtitleLine).filter(SubtitleLine.project_id==p.id).delete()
  for i,line in enumerate(batch.lines): db.add(SubtitleLine(project_id=p.id,line_index=i,start=line.start,end=line.end,text=line.text,words_json=json.dumps(line.words,ensure_ascii=False) if line.words else None))
  db.commit(); return {'ok':True,'count':len(batch.lines)}
+def run_transcription_job(job_id:int, media_path:str, language:str|None, model_size:str):
+    """Run Whisper after the HTTP response has been returned to the browser."""
+    with SessionLocal() as job_db:
+        job=job_db.get(Job,job_id)
+        if job is None:
+            return
+        job.status='running'
+        job.progress=max(job.progress,5)
+        job.error=None
+        job_db.commit()
+
+        def update_progress(value:int):
+            current=job_db.get(Job,job_id)
+            if current is None or current.status not in ('queued','running'):
+                return
+            current.progress=max(current.progress,min(95,int(value)))
+            job_db.commit()
+
+        try:
+            lines=transcribe_file(media_path,language,model_size,progress_callback=update_progress)
+            job_db.query(SubtitleLine).filter(SubtitleLine.project_id==job.project_id).delete()
+            for i,line in enumerate(lines):
+                job_db.add(SubtitleLine(
+                    project_id=job.project_id,
+                    line_index=i,
+                    start=line['start'],
+                    end=line['end'],
+                    text=line['text'],
+                    words_json=json.dumps(line.get('words'),ensure_ascii=False) if line.get('words') else None,
+                ))
+            job=job_db.get(Job,job_id)
+            if job is not None:
+                job.status='done'
+                job.progress=100
+                job.error=None
+            job_db.commit()
+        except Exception as exc:
+            job_db.rollback()
+            print(f"Transcription job {job_id} failed: {type(exc).__name__}: {exc}")
+            job=job_db.get(Job,job_id)
+            if job is not None:
+                job.status='failed'
+                job.error=f"Transcription failed ({type(exc).__name__}). Try a shorter, valid audio/video file. For longer files, run LocalSubs locally."
+                job_db.commit()
+
+
 @app.post('/projects/{project_id}/transcribe')
-def transcribe(project_id:int,data:TranscribeRequest,user:User=Depends(get_current_user),db:Session=Depends(get_db)):
- p=owned_project(project_id,user,db); media=db.scalar(select(MediaFile).where(MediaFile.project_id==p.id).order_by(MediaFile.id.desc()))
- if not media: raise HTTPException(400,'Upload a media file first')
- job=Job(project_id=p.id,type='transcribe',status='running',progress=5); db.add(job); db.commit(); db.refresh(job)
- try:
-  lines=transcribe_file(media.path,data.language or (None if p.language=='auto' else p.language),data.model_size or settings.whisper_model)
-  db.query(SubtitleLine).filter(SubtitleLine.project_id==p.id).delete()
-  for i,line in enumerate(lines): db.add(SubtitleLine(project_id=p.id,line_index=i,start=line['start'],end=line['end'],text=line['text'],words_json=json.dumps(line.get('words'),ensure_ascii=False)))
-  job.status='done'; job.progress=100; db.commit(); return {'job_id':job.id,'status':job.status,'count':len(lines)}
- except Exception as exc:
-  job.status='failed'; job.error=str(exc)[:1000]; db.commit(); raise HTTPException(500,f'Transcription failed: {str(exc)[:300]}')
+def transcribe(project_id:int,data:TranscribeRequest,background_tasks:BackgroundTasks,user:User=Depends(get_current_user),db:Session=Depends(get_db)):
+    p=owned_project(project_id,user,db)
+    media=db.scalar(select(MediaFile).where(MediaFile.project_id==p.id).order_by(MediaFile.id.desc()))
+    if not media:
+        raise HTTPException(400,'Upload a media file first')
+    model_size=data.model_size or settings.whisper_model
+    if model_size not in {'tiny','base','small','medium','large-v3'}:
+        raise HTTPException(422,'Model size must be tiny, base, small, medium, or large-v3')
+    language=data.language or (None if p.language=='auto' else p.language)
+    job=Job(project_id=p.id,type='transcribe',status='queued',progress=0)
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    background_tasks.add_task(run_transcription_job,job.id,media.path,language,model_size)
+    return {'job_id':job.id,'status':'queued','count':0}
+
+
 @app.get('/jobs/{job_id}')
 def get_job(job_id:int,user:User=Depends(get_current_user),db:Session=Depends(get_db)):
- job=db.scalar(select(Job).join(Project).where(Job.id==job_id,Project.user_id==user.id))
- if not job: raise HTTPException(404,'Job not found')
- return {'id':job.id,'type':job.type,'status':job.status,'progress':job.progress,'error':job.error}
+    job=db.scalar(select(Job).join(Project).where(Job.id==job_id,Project.user_id==user.id))
+    if not job:
+        raise HTTPException(404,'Job not found')
+    return {'id':job.id,'type':job.type,'status':job.status,'progress':job.progress,'error':job.error}
 @app.get('/projects/{project_id}/export/{fmt}')
 def export_subtitles(project_id:int,fmt:str,user:User=Depends(get_current_user),db:Session=Depends(get_db)):
  owned_project(project_id,user,db); rows=db.scalars(select(SubtitleLine).where(SubtitleLine.project_id==project_id).order_by(SubtitleLine.line_index)).all(); lines=[{'start':x.start,'end':x.end,'text':x.text,'words':json.loads(x.words_json) if x.words_json else None} for x in rows]
