@@ -13,7 +13,7 @@ router=APIRouter(prefix='/auth',tags=['auth'])
 COOKIE='localsubs_refresh'
 def issue(db,user_id,family):
  raw=new_refresh(); db.add(RefreshToken(user_id=user_id,family_id=family,token_hash=hash_refresh(raw),expires_at=datetime.now(timezone.utc)+timedelta(days=settings.refresh_token_days))); return raw
-def payload(user): return {'access_token':create_access_token(user.id),'token_type':'bearer','user':{'id':user.id,'email':user.email}}
+def payload(user): return {'access_token':create_access_token(user.id),'token_type':'bearer','user':{'id':user.id,'email':user.email,'is_admin':bool(user.is_admin)}}
 def set_cookie(response,raw): response.set_cookie(COOKIE,raw,httponly=True,samesite='lax',secure=True,max_age=settings.refresh_token_days*86400,path='/auth')
 @router.post('/register')
 def register(data:Credentials,response:Response,db:Session=Depends(get_db)):
@@ -45,4 +45,4 @@ def logout(response:Response,raw:str|None=Cookie(default=None,alias=COOKIE),db:S
   if token and not token.revoked_at: token.revoked_at=datetime.now(timezone.utc); db.commit()
  response.delete_cookie(COOKIE,path='/auth'); return {'ok':True}
 @router.get('/me')
-def me(user:User=Depends(get_current_user)): return {'id':user.id,'email':user.email}
+def me(user:User=Depends(get_current_user)): return {'id':user.id,'email':user.email,'is_admin':bool(user.is_admin)}
