@@ -22,6 +22,10 @@ services:
         value: "500"
       - key: CORS_ORIGINS
         value: https://localsubs-frontend.onrender.com
+      - key: ADMIN_EMAIL
+        value: admin@localsubs.app
+      - key: ADMIN_PASSWORD
+        sync: false
     disk:
       name: localsubs-data
       mountPath: /var/data
@@ -35,6 +39,8 @@ services:
     envVars:
       - key: VITE_API_URL
         value: https://localsubs-api.onrender.com
+      - key: VITE_ADMIN_EMAIL
+        value: admin@localsubs.app
     routes:
       - type: rewrite
         source: /*
