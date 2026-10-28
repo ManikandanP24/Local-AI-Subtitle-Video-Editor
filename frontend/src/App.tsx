@@ -25,7 +25,30 @@ export default function App(){
  async function createProject(){try{const r=await call('/projects',{method:'POST',body:JSON.stringify({title:title.trim()||'Untitled project',language})});const p=await r.json();setProjects(a=>[p,...a]);setActive(p);setTitle('');setLines([]);setMedia(null);setMediaUrl(null);setNotice('Project created')}catch(e){setError((e as Error).message)}}
  async function openProject(p:Project){setActive(p);setLanguage(p.language||'auto');setMedia(null);setMediaUrl(null);setVideoTime(0);setMogrtName('');setMogrtNote('');try{setLines(await(await call('/projects/'+p.id+'/subtitles')).json())}catch(e){setError((e as Error).message)}}
  async function uploadVideo(file?:File){if(!file||!active)return;setBusy(true);try{const f=new FormData();f.append('file',file);const d=await(await call('/projects/'+active.id+'/media',{method:'POST',body:f})).json();setMedia(d);const stream=await call(d.stream_url);setMediaUrl(URL.createObjectURL(await stream.blob()));setNotice('Media uploaded');await loadProjects()}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
- async function transcribe(){if(!active)return;setBusy(true);setError('');setNotice('Transcribing locally. First run may download the Whisper model.');try{const d=await(await call('/projects/'+active.id+'/transcribe',{method:'POST',body:JSON.stringify({language:language==='auto'?null:language,model_size:null})})).json();setLines(await(await call('/projects/'+active.id+'/subtitles')).json());setNotice('Transcription complete · '+d.count+' caption lines');await loadProjects()}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
+ async function transcribe(){
+  if(!active)return
+  setBusy(true);setError('');setNotice('Starting caption generation…')
+  try{
+   const started=await(await call('/projects/'+active.id+'/transcribe',{method:'POST',body:JSON.stringify({language:language==='auto'?null:language,model_size:null})})).json()
+   const jobId=started.job_id as number
+   let job:{status:string;progress:number;error:string|null}={status:started.status||'queued',progress:0,error:null}
+   for(let attempt=0;attempt<240&&job.status!=='done'&&job.status!=='failed';attempt++){
+    await new Promise<void>(resolve=>window.setTimeout(resolve,2000))
+    job=await(await call('/jobs/'+jobId)).json()
+    if(job.status==='queued')setNotice('Waiting for caption worker…')
+    else if(job.progress<15)setNotice('Preparing audio… '+job.progress+'%')
+    else if(job.progress<28)setNotice('Loading Whisper model… '+job.progress+'%')
+    else setNotice('Generating captions… '+job.progress+'%')
+   }
+   if(job.status==='failed')throw Error(job.error||'Caption generation failed. Try a shorter video or audio file.')
+   if(job.status!=='done')throw Error('Caption generation is taking too long on the hosted free server. Try a shorter clip, or run LocalSubs on your computer for longer videos.')
+   const updated=await(await call('/projects/'+active.id+'/subtitles')).json()
+   setLines(updated)
+   setNotice('Transcription complete · '+updated.length+' caption lines')
+   await loadProjects()
+  }catch(e){setError((e as Error).message);setNotice('')}
+  finally{setBusy(false)}
+ }
  async function save(){if(!active)return;try{await call('/projects/'+active.id+'/subtitles',{method:'PUT',body:JSON.stringify({lines:lines.map(l=>({...l,start:Number(l.start),end:Number(l.end)}))})});setNotice('Subtitle edits saved');await loadProjects()}catch(e){setError((e as Error).message)}}
  async function exportFile(fmt:string){if(!active)return;try{const r=await call('/projects/'+active.id+'/export/'+fmt);const u=URL.createObjectURL(await r.blob());const a=document.createElement('a');a.href=u;a.download='localsubs-'+active.id+'.'+fmt;a.click();URL.revokeObjectURL(u)}catch(e){setError((e as Error).message)}}
  async function uploadMogrt(file?:File){if(!file||!active)return;setMogrtNote('Uploading style asset…');try{const f=new FormData();f.append('file',file);const d=await(await call('/projects/'+active.id+'/styles/mogrt',{method:'POST',body:f})).json();setMogrtName(d.filename);setMogrtNote(d.render_note||'Template uploaded.')}catch(e){setMogrtNote((e as Error).message)}}
