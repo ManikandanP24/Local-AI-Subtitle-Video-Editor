@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     storage_dir: str = '../storage'
     max_upload_mb: int = 2048
     cors_origins: str = 'http://localhost:5173'
+    admin_email: str = 'admin@localsubs.app'
+    admin_password: str = ''
 settings = Settings()
 if not settings.jwt_secret:
     settings.jwt_secret = secrets.token_urlsafe(48)
