@@ -12,6 +12,7 @@ from .schemas import ProjectCreate,SubtitleBatch,TranscribeRequest
 from .auth.routes import router as auth_router
 from .auth.deps import get_current_user
 from .services.transcribe import transcribe_file
+from .services.ffmpeg import ffmpeg_available
 from .services.exporters import export_srt,export_vtt,export_txt,export_ass
 from .routes_styles import router as styles_router
 Base.metadata.create_all(bind=engine)
@@ -20,7 +21,7 @@ app.add_middleware(CORSMiddleware,allow_origins=[x.strip() for x in settings.cor
 app.include_router(auth_router); app.include_router(styles_router)
 ALLOWED={'.mp4','.mov','.mkv','.webm','.mp3','.wav'}; MAX_BYTES=settings.max_upload_mb*1024*1024
 @app.get('/health')
-def health(): return {'ok':True,'ffmpeg':bool(shutil.which('ffmpeg')),'transcription':'local model loads on demand'}
+def health(): return {'ok':True,'ffmpeg':ffmpeg_available(),'transcription':'model loads on demand'}
 def owned_project(pid,user,db):
  p=db.scalar(select(Project).where(Project.id==pid,Project.user_id==user.id))
  if not p: raise HTTPException(404,'Project not found')
