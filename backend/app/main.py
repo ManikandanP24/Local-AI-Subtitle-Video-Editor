@@ -29,8 +29,8 @@ def ensure_default_admin():
     if not admin_email or not admin_password:
         print("ADMIN_EMAIL / ADMIN_PASSWORD not configured; skipping default admin bootstrap.")
         return
-    if len(admin_password) < 16:
-        print("ADMIN_PASSWORD must be at least 16 characters; skipping default admin bootstrap.")
+    if len(admin_password) < 8:
+        print("ADMIN_PASSWORD must be at least 8 characters; skipping default admin bootstrap.")
         return
     with SessionLocal() as db:
         user = db.scalar(select(User).where(User.email == admin_email))
