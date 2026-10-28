@@ -143,7 +143,7 @@ def get_job(job_id:int,user:User=Depends(get_current_user),db:Session=Depends(ge
  return {'id':job.id,'type':job.type,'status':job.status,'progress':job.progress,'error':job.error}
 @app.get('/projects/{project_id}/export/{fmt}')
 def export_subtitles(project_id:int,fmt:str,user:User=Depends(get_current_user),db:Session=Depends(get_db)):
- owned_project(project_id,user,db); rows=db.scalars(select(SubtitleLine).where(SubtitleLine.project_id==project_id).order_by(SubtitleLine.line_index)).all(); lines=[{'start':x.start,'end':x.end,'text':x.text} for x in rows]
+ owned_project(project_id,user,db); rows=db.scalars(select(SubtitleLine).where(SubtitleLine.project_id==project_id).order_by(SubtitleLine.line_index)).all(); lines=[{'start':x.start,'end':x.end,'text':x.text,'words':json.loads(x.words_json) if x.words_json else None} for x in rows]
  formats={'srt':(export_srt,'application/x-subrip'),'vtt':(export_vtt,'text/vtt'),'txt':(export_txt,'text/plain'),'ass':(export_ass,'text/plain')}
  if fmt not in formats: raise HTTPException(400,'Supported formats: srt, vtt, txt, ass')
  fn,mime=formats[fmt]; return Response(content=fn(lines),media_type=mime,headers={'Content-Disposition':f'attachment; filename="localsubs-{project_id}.{fmt}"'})
